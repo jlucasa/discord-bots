@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 client = discord.Client()
 load_dotenv()
 
-LINK_FP = './meeting-note-links.json'
+LINK_FP = './meeting-notes-bot/meeting-note-links.json'
 
 
 async def register_note(message, args):
