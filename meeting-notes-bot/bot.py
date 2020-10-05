@@ -74,7 +74,7 @@ async def on_message(message):
             await send_help(f'Could not interpret command {command}', message)
             return
 
-        command_map[command](message, args=compose_args(command))
+        await command_map[command](message, args=compose_args(command))
 
 
 def compose_args(command):
