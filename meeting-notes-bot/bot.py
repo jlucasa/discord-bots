@@ -81,7 +81,7 @@ def compose_args(command):
     return command[2:] if len(command) >= 3 else None
 
 
-def send_help(error_msg, message):
+async def send_help(error_msg, message):
     await message.channel.send(error_msg)
     await message.channel.send(help_embed())
 
