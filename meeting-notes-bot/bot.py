@@ -10,6 +10,38 @@ load_dotenv()
 LINK_FP = './meeting-notes-bot/meeting-note-links.json'
 
 
+def is_valid_entry_string(entry):
+    valid_month_names = [
+        'jan',
+        'feb',
+        'mar',
+        'apr',
+        'may',
+        'jun',
+        'jul',
+        'aug',
+        'sep',
+        'oct',
+        'nov',
+        'dec'
+    ]
+
+    valid_note_names = [
+        'w1',
+        'w2',
+        'w3',
+        'w4',
+        'm',
+        'other'
+    ]
+
+    split_entry = entry.split('-')
+    month = split_entry[0]
+    note_name = split_entry[1]
+
+    return month in valid_month_names and note_name in valid_note_names
+
+
 async def register_note(message, args):
     if not args:
         await send_help(f'Could not interpret register command {message.content}', message)
@@ -43,7 +75,6 @@ async def register_note(message, args):
 
 
 async def serve_note(message, args):
-    print(args)
     if not args:
         await send_help('Could not interpret serve command', message)
         return
@@ -56,6 +87,39 @@ async def serve_note(message, args):
         return
 
     await message.channel.send(f'Here\'s that link! {meeting_link_data[entry]}')
+
+
+async def send_help(error_msg, message):
+    embed = discord.Embed(
+        title="Commands Help",
+        description="test",
+        color=0x00ff00
+    )
+
+    embed.add_field(
+        name="this is a test",
+        value="of what embeds look like. this embed is not inline",
+        inline=False
+    )
+
+    embed.add_field(
+        name="this is another test",
+        value="of what embeds look like. this embed is inline",
+        inline=True
+    )
+    
+    await message.channel.send(error_msg)
+    await message.channel.send(embed)
+
+
+async def open_json_file(fp):
+    with open(fp) as file:
+        return json.load(file)
+
+
+async def save_to_json_file(data, fp):
+    with open(fp, 'w') as file:
+        json.dump(data, file)
 
 
 @client.event
@@ -87,75 +151,6 @@ async def on_message(message):
             return
 
         await command_map[command](message, args=message_args)
-
-
-async def send_help(error_msg, message):
-    await message.channel.send(error_msg)
-    await message.channel.send(help_embed())
-
-
-def is_valid_entry_string(entry):
-    valid_month_names = [
-        'jan',
-        'feb',
-        'mar',
-        'apr',
-        'may',
-        'jun',
-        'jul',
-        'aug',
-        'sep',
-        'oct',
-        'nov',
-        'dec'
-    ]
-
-    valid_note_names = [
-        'w1',
-        'w2',
-        'w3',
-        'w4',
-        'm',
-        'other'
-    ]
-
-    split_entry = entry.split('-')
-    month = split_entry[0]
-    note_name = split_entry[1]
-
-    return month in valid_month_names and note_name in valid_note_names
-
-
-def help_embed():
-    embed = discord.Embed(
-        title="Commands Help",
-        description="test",
-        color=0x00ff00
-    )
-
-    embed.add_field(
-        name="this is a test",
-        value="of what embeds look like. this embed is not inline",
-        inline=False
-    )
-
-    embed.add_field(
-        name="this is another test",
-        value="of what embeds look like. this embed is inline",
-        inline=True
-    )
-
-    return embed
-
-
-async def open_json_file(fp):
-    with open(fp) as file:
-        return json.load(file)
-
-
-async def save_to_json_file(data, fp):
-    with open(fp, 'w') as file:
-        json.dump(data, file)
 
 
 def main():
