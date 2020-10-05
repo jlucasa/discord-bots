@@ -1,1 +1,1 @@
-worker: python3 ./meeting-notes-bot/bot.py
+worker: python ./meeting-notes-bot/bot.py
