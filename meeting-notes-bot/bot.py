@@ -12,7 +12,7 @@ LINK_FP = './meeting-note-links.json'
 
 async def register_note(message, args):
     if not args:
-        send_help(f'Could not interpret register command {message.content}', message.channel)
+        await send_help(f'Could not interpret register command {message.content}', message.channel)
 
     link = args[0]
     entry = args[1]
@@ -35,7 +35,7 @@ async def register_note(message, args):
 
 async def serve_note(message, args):
     if not args:
-        send_help('Could not interpret serve command', message.channel)
+        await send_help('Could not interpret serve command', message.channel)
         return
 
     entry = args[0]
@@ -64,14 +64,14 @@ async def on_message(message):
         return
 
     if message.content.strip() == '!notes':
-        send_help('You didn\'t seem to put a command in!', message)
+        await send_help('You didn\'t seem to put a command in!', message)
         return
 
     if message.startswith('!notes'):
         command = message.content.split()[1]
 
         if command not in command_map.keys():
-            send_help(f'Could not interpret command {command}', message)
+            await send_help(f'Could not interpret command {command}', message)
             return
 
         command_map[command](message, args=compose_args(command))
