@@ -16,10 +16,13 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    if message.content.startswith('!regnotes'):
+    if message.content.startswith('!notes help'):
+        await message.channel.send(help_embed())
+        return
+    elif message.content.startswith('!notes reg'):
         message_args = message.content.split()
 
-        if len(message_args) != 3:
+        if len(message_args) != 4:
             await message.channel.send('Bad format! Try something different')
             return
 
@@ -36,11 +39,10 @@ async def on_message(message):
         await save_to_json_file(meeting_link_data, './meeting-note-links.json')
 
         await message.channel.send(f'Saved link for {json_entry}')
-
-    if message.content.startswith('!servenotes'):
+    elif message.content.startswith('!notes serve'):
         message_args = message.content.split()
 
-        if len(message_args) != 2:
+        if len(message_args) != 3:
             await message.channel.send('Bad format! Try something different')
             return
 
@@ -53,7 +55,31 @@ async def on_message(message):
             return
 
         await message.channel.send(f'Here\'s that link! {meeting_link_data[json_entry]}')
+    else:
+        await message.channel.send(f'Could not understand command {message.content}')
+        await message.channel.send(help_embed())
 
+
+async def help_embed():
+    embed = discord.Embed(
+        title="Commands Help",
+        description="test",
+        color=0x00ff00
+    )
+
+    embed.add_field(
+        name="this is a test",
+        value="of what embeds look like. this embed is not inline",
+        inline=False
+    )
+
+    embed.add_field(
+        name="this is another test",
+        value="of what embeds look like. this embed is inline",
+        inline=True
+    )
+
+    return embed
 
 async def open_json_file(fp):
     with open(fp) as file:
