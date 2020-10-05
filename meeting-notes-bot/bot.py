@@ -67,7 +67,7 @@ async def on_message(message):
         await send_help('You didn\'t seem to put a command in!', message)
         return
 
-    if message.startswith('!notes'):
+    if message.content.startswith('!notes'):
         command = message.content.split()[1]
 
         if command not in command_map.keys():
