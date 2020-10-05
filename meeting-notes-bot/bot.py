@@ -90,26 +90,26 @@ async def serve_note(message, args):
 
 
 async def send_help(error_msg, message):
-    embed = discord.Embed(
+    help_embed = discord.Embed(
         title="Commands Help",
         description="test",
         color=0x00ff00
     )
 
-    embed.add_field(
+    help_embed.add_field(
         name="this is a test",
         value="of what embeds look like. this embed is not inline",
         inline=False
     )
 
-    embed.add_field(
+    help_embed.add_field(
         name="this is another test",
         value="of what embeds look like. this embed is inline",
         inline=True
     )
-    
+
     await message.channel.send(error_msg)
-    await message.channel.send(embed)
+    await message.channel.send(embed=help_embed)
 
 
 async def open_json_file(fp):
