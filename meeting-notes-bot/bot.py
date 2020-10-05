@@ -12,13 +12,22 @@ LINK_FP = './meeting-notes-bot/meeting-note-links.json'
 
 async def register_note(message, args):
     if not args:
-        await send_help(f'Could not interpret register command {message.content}', message.channel)
+        await send_help(f'Could not interpret register command {message.content}', message)
+        return
+
+    if len(args) < 2:
+        await send_help(f'Not enough arguments in {message.content}', message)
+        return
 
     link = args[0]
     entry = args[1]
 
     if not validators.url(link):
         await message.channel.send(f'Invalid link: {link}')
+        return
+
+    if not is_valid_entry_string(entry):
+        await message.channel.send(f'Invalid entry: {entry}')
         return
 
     meeting_link_data = await open_json_file(LINK_FP)
@@ -36,7 +45,7 @@ async def register_note(message, args):
 async def serve_note(message, args):
     print(args)
     if not args:
-        await send_help('Could not interpret serve command', message.channel)
+        await send_help('Could not interpret serve command', message)
         return
 
     entry = args[0]
@@ -69,22 +78,52 @@ async def on_message(message):
         return
 
     if message.content.startswith('!notes'):
-        command = message.content.split()[1]
+        split_message = message.content.split()
+        command = split_message[1]
+        message_args = split_message[2:] if len(split_message) >= 3 else None
 
         if command not in command_map.keys():
             await send_help(f'Could not interpret command {command}', message)
             return
 
-        await command_map[command](message, args=compose_args(command))
-
-
-def compose_args(command):
-    return command[2:] if len(command) >= 3 else None
+        await command_map[command](message, args=message_args)
 
 
 async def send_help(error_msg, message):
     await message.channel.send(error_msg)
     await message.channel.send(help_embed())
+
+
+def is_valid_entry_string(entry):
+    valid_month_names = [
+        'jan',
+        'feb',
+        'mar',
+        'apr',
+        'may',
+        'jun',
+        'jul',
+        'aug',
+        'sep',
+        'oct',
+        'nov',
+        'dec'
+    ]
+
+    valid_note_names = [
+        'w1',
+        'w2',
+        'w3',
+        'w4',
+        'm',
+        'other'
+    ]
+
+    split_entry = entry.split('-')
+    month = split_entry[0]
+    note_name = split_entry[1]
+
+    return month in valid_month_names and note_name in valid_note_names
 
 
 def help_embed():
