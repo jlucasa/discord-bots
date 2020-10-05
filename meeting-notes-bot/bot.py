@@ -34,6 +34,7 @@ async def register_note(message, args):
 
 
 async def serve_note(message, args):
+    print(args)
     if not args:
         await send_help('Could not interpret serve command', message.channel)
         return
