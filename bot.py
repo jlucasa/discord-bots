@@ -132,9 +132,8 @@ async def register_notefile(message, args):
         return
 
     notefp = args[0]
-    print(notefp)
 
-    if file_already_exists(notefp):
+    if await file_already_exists(notefp):
         await send_help(f'File {notefp} already exists', message)
         return
 
