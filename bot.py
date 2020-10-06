@@ -2,6 +2,7 @@ import discord
 import os
 import json
 import validators
+import glob
 from dotenv import load_dotenv
 
 # TODO: make dictionary of arguments for each function to provide help with more modularity
@@ -142,7 +143,13 @@ async def register_notefile(message, args):
 
 
 async def list_allfiles(message, args):
-    all_files = os.listdir()
+    os.chdir('files')
+    all_files = glob.glob('*.json')
+    os.chdir('..')
+
+    if len(all_files) == 0:
+        await message.channel.send('There were no files to be found!')
+        return
 
     files_embed = discord.Embed(
         title='All files',
