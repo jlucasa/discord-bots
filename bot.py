@@ -4,71 +4,59 @@ import json
 import validators
 from dotenv import load_dotenv
 
+# Instantiate client and load environment
 client = discord.Client()
 load_dotenv()
 
-LINK_FP = './meeting-notes-bot/meeting-note-links.json'
+# Filepath for link JSON
+LINK_FP = './meeting-note-links.json'
 
 
-def is_valid_entry_string(entry):
-    valid_month_names = [
-        'jan',
-        'feb',
-        'mar',
-        'apr',
-        'may',
-        'jun',
-        'jul',
-        'aug',
-        'sep',
-        'oct',
-        'nov',
-        'dec'
-    ]
-
-    valid_note_names = [
-        'w1',
-        'w2',
-        'w3',
-        'w4',
-        'm',
-        'other'
-    ]
-
-    split_entry = entry.split('-')
-    month = split_entry[0]
-    note_name = split_entry[1]
-
-    return month in valid_month_names and note_name in valid_note_names
-
-
+# Register a link to a note in the JSON file at LINK_FP
 async def register_note(message, args):
     if not args:
+        # Args could not be passed in some way
         await send_help(f'Could not interpret register command {message.content}', message)
         return
 
     if len(args) < 2:
+        # There are not enough arguments to complete the command
         await send_help(f'Not enough arguments in {message.content}', message)
         return
 
+    # Note link is first argument, entry is second argument
     link = args[0]
     entry = args[1]
+    should_update = False
+
+    if len(args) == 3:
+        should_update = True if args[2] == '--update' else False
 
     if not validators.url(link):
-        await message.channel.send(f'Invalid link: {link}')
+        # URL is not valid
+        await message.channel.send(f'Invalid URL: {link}')
         return
 
-    if not is_valid_entry_string(entry):
-        await message.channel.send(f'Invalid entry: {entry}')
-        return
-
+    # Fetch all the data from the JSON file at LINK_FP
     meeting_link_data = await open_json_file(LINK_FP)
 
     if entry in meeting_link_data:
-        await message.channel.send(f'A link already exists for {entry}: Updating link...')
+        # There is already an entry with the given name in the JSON file at LINK_FP
+        if should_update:
+            # The user is already aware that there is a link at this entry and would like to update the link
+            await message.channel.send(f'A link already exists for {entry}: Updating link...')
+        else:
+            # The user is likely unaware that there is a link at this entry
+            await send_help(
+                f'A link already exists for {entry}, and you did not specify to update using --update.',
+                message
+            )
+            return
 
+    # Update the imported link data
     meeting_link_data.update({entry: link})
 
+    # Save the updated data to the JSON file at LINK_FP
     await save_to_json_file(meeting_link_data, LINK_FP)
 
     await message.channel.send(f'Saved link for {entry}')
@@ -91,9 +79,14 @@ async def serve_note(message, args):
 
 async def send_help(error_msg, message):
     help_embed = discord.Embed(
-        title="Commands Help",
-        description="test",
-        color=0x00ff00
+        title='Commands Help',
+        description='How to use me to register and serve up meeting notes!',
+        color=0xff0000
+    )
+
+    help_embed.add_field(
+        name='Serve notes',
+        value='Usage: !notes serve <NAME>'
     )
 
     help_embed.add_field(
