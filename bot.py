@@ -127,7 +127,7 @@ async def search_for_notes(message, args):
 
 async def register_notefile(message, args):
     if not args:
-        # Args could not be passed in in some way
+        # Args could not be passed in some way
         await send_help('Could not interpret regfile command', message)
         return
 
@@ -140,6 +140,27 @@ async def register_notefile(message, args):
     await create_json_file(notefp)
     await message.channel.send(f'Successfully created note file {notefp}')
 
+
+async def list_allfiles(message, args):
+    if not args:
+        # Args could not be passed in some way
+        await send_help('Could not interpret listfiles command', message)
+        return
+
+    all_files = os.listdir()
+
+    files_embed = discord.Embed(
+        title='All files',
+        color=0xff0000
+    )
+
+    for file in all_files:
+        files_embed.add_field(
+            name=file,
+            value='test'
+        )
+
+    await message.channel.send(embed=files_embed)
 
 
 async def send_help(error_msg, message):
@@ -199,7 +220,8 @@ async def on_message(message):
         'reg': register_note,
         'serve': serve_note,
         'regfile': register_notefile,
-        'search': search_for_notes
+        'search': search_for_notes,
+        'listfiles': list_allfiles
     }
 
     if message.author == client.user:
