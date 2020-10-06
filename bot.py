@@ -31,7 +31,7 @@ async def register_note(message, args):
     link = args[2]
     should_update = True if len(args) == 4 and args[3] == '--update' else False
 
-    if file_doesnt_exist(fp):
+    if await file_already_exists_check(fp):
         message.channel.send(f'Invalid filepath')
 
     if not validators.url(link):
@@ -101,8 +101,8 @@ async def search_for_notes(message, args):
     all_entries = list(data.keys())
     results = []
 
-    if file_doesnt_exist(fp):
-        await send_help(f'File "{fp}" doesn\'t already exists', message)
+    if not await file_already_exists_check(fp):
+        await send_help(f'File "{fp}" doesn\'t exist', message)
         return
 
     results.append(entry_i for entry_i in all_entries if entry_i.startswith(search_entry))
@@ -133,7 +133,7 @@ async def register_notefile(message, args):
 
     notefp = args[0]
 
-    if await file_already_exists(notefp):
+    if await file_already_exists_check(notefp):
         await send_help(f'File {notefp} already exists', message)
         return
 
@@ -185,13 +185,8 @@ async def create_json_file(fp):
         return
 
 
-async def file_already_exists(fp):
-    return True if len(os.listdir(fp)) != 0 else False
-
-
-async def file_doesnt_exist(fp):
-    return True if len(os.listdir(fp)) == 0 else False
-
+async def file_already_exists_check(fp):
+    return os.path.exists(fp)
 
 @client.event
 async def on_ready():
