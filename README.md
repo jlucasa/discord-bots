@@ -1,2 +1,2 @@
-# discord-bots
- Discord bots that I choose to make sometimes
+# meeting-notes-bot
+Lightweight bot that serves and registers links to notes in JSON files
