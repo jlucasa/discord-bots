@@ -4,12 +4,12 @@ import json
 import validators
 from dotenv import load_dotenv
 
+# TODO: make dictionary of arguments for each function to provide help with more modularity
+# TODO: make functions part of an object to safely store information in sessions
+
 # Instantiate client and load environment
 client = discord.Client()
 load_dotenv()
-
-# Filepath for link JSON
-LINK_FP = './meeting-note-links.json'
 
 
 # Register a link to a note in the JSON file at LINK_FP
@@ -19,29 +19,31 @@ async def register_note(message, args):
         await send_help(f'Could not interpret register command {message.content}', message)
         return
 
-    if len(args) < 2:
+    if len(args) < 3:
         # There are not enough arguments to complete the command
-        await send_help(f'Not enough arguments in {message.content}', message)
+        await send_help(f'Not enough arguments in "{message.content}"', message)
         return
 
+    # Filepath is first argument, entry is second argument, link is third argument
     # Note link is first argument, entry is second argument
-    link = args[0]
+    fp = args[0]
     entry = args[1]
-    should_update = False
+    link = args[2]
+    should_update = True if len(args) == 4 and args[3] == '--update' else False
 
-    if len(args) == 3:
-        should_update = True if args[2] == '--update' else False
+    if file_doesnt_exist(fp):
+        message.channel.send(f'Invalid filepath')
 
     if not validators.url(link):
         # URL is not valid
         await message.channel.send(f'Invalid URL: {link}')
         return
 
-    # Fetch all the data from the JSON file at LINK_FP
-    meeting_link_data = await open_json_file(LINK_FP)
+    # Fetch all the data from the JSON file at fp
+    meeting_link_data = await open_json_file(fp)
 
     if entry in meeting_link_data:
-        # There is already an entry with the given name in the JSON file at LINK_FP
+        # There is already an entry with the given name in the JSON file at fp
         if should_update:
             # The user is already aware that there is a link at this entry and would like to update the link
             await message.channel.send(f'A link already exists for {entry}: Updating link...')
@@ -56,8 +58,8 @@ async def register_note(message, args):
     # Update the imported link data
     meeting_link_data.update({entry: link})
 
-    # Save the updated data to the JSON file at LINK_FP
-    await save_to_json_file(meeting_link_data, LINK_FP)
+    # Save the updated data to the JSON file at fp
+    await save_to_json_file(meeting_link_data, fp)
 
     await message.channel.send(f'Saved link for {entry}')
 
@@ -67,14 +69,77 @@ async def serve_note(message, args):
         await send_help('Could not interpret serve command', message)
         return
 
-    entry = args[0]
-    meeting_link_data = await open_json_file(LINK_FP)
+    if len(args) < 2:
+        await send_help(f'Not enough arguments in "{message.content}"', message)
+        return
+
+    fp = args[0]
+    entry = args[1]
+
+    meeting_link_data = await open_json_file(fp)
 
     if entry not in meeting_link_data.keys():
         await message.channel.send(f'No link exists for {entry}')
         return
 
     await message.channel.send(f'Here\'s that link! {meeting_link_data[entry]}')
+
+
+async def search_for_notes(message, args):
+    if not args:
+        await send_help('Could not interpret search command', message)
+        return
+
+    if len(args) < 2:
+        await send_help(f'Not enough arguments in "{message.content}"', message)
+        return
+
+    fp = args[0]
+    search_entry = args[1]
+
+    data = await open_json_file(fp)
+    all_entries = list(data.keys())
+    results = []
+
+    if file_doesnt_exist(fp):
+        await send_help(f'File "{fp}" doesn\'t already exists', message)
+        return
+
+    results.append(entry_i for entry_i in all_entries if entry_i.startswith(search_entry))
+
+    if len(results) > 10:
+        await message.channel.send('Greater than 10 results for entry -- only showing first 10')
+        results = results[:10]
+
+    results_embed = discord.Embed(
+        title='Search Results',
+        color=0xff0000
+    )
+
+    for result_i in results:
+        results_embed.add_field(
+            name=str(result_i),
+            value=f'Command: !notes serve {fp} {result_i}'
+        )
+
+    await message.channel.send(embed=results_embed)
+
+
+async def register_notefile(message, args):
+    if not args:
+        # Args could not be passed in in some way
+        await send_help('Could not interpret regfile command', message)
+        return
+
+    notefp = args[0]
+
+    if file_already_exists(notefp):
+        await send_help(f'File {notefp} already exists', message)
+        return
+
+    await create_json_file(notefp)
+    await message.channel.send(f'Successfully created note file {notefp}')
+
 
 
 async def send_help(error_msg, message):
@@ -113,6 +178,19 @@ async def open_json_file(fp):
 async def save_to_json_file(data, fp):
     with open(fp, 'w') as file:
         json.dump(data, file)
+
+
+async def create_json_file(fp):
+    with open(fp, 'w+') as file:
+        return
+
+
+async def file_already_exists(fp):
+    return True if len(os.listdir(fp)) != 0 else False
+
+
+async def file_doesnt_exist(fp):
+    return True if len(os.listdir(fp)) == 0 else False
 
 
 @client.event
