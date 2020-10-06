@@ -202,7 +202,9 @@ async def on_ready():
 async def on_message(message):
     command_map = {
         'reg': register_note,
-        'serve': serve_note
+        'serve': serve_note,
+        'regfile': register_notefile,
+        'search': search_for_notes
     }
 
     if message.author == client.user:
