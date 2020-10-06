@@ -142,7 +142,7 @@ async def register_notefile(message, args):
 
 
 async def list_allfiles(message, args):
-    all_files = os.listdir('./files/*.json')
+    all_files = os.listdir()
 
     files_embed = discord.Embed(
         title='All files',
