@@ -26,7 +26,7 @@ async def register_note(message, args):
 
     # Filepath is first argument, entry is second argument, link is third argument
     # Note link is first argument, entry is second argument
-    fp = args[0]
+    fp = f'./files/{args[0]}'
     entry = args[1]
     link = args[2]
     should_update = True if len(args) == 4 and args[3] == '--update' else False
@@ -73,7 +73,7 @@ async def serve_note(message, args):
         await send_help(f'Not enough arguments in "{message.content}"', message)
         return
 
-    fp = args[0]
+    fp = f'./files/{args[0]}'
     entry = args[1]
 
     meeting_link_data = await open_json_file(fp)
@@ -94,7 +94,7 @@ async def search_for_notes(message, args):
         await send_help(f'Not enough arguments in "{message.content}"', message)
         return
 
-    fp = args[0]
+    fp = f'./files/{args[0]}'
     search_entry = args[1]
 
     data = await open_json_file(fp)
@@ -131,7 +131,7 @@ async def register_notefile(message, args):
         await send_help('Could not interpret regfile command', message)
         return
 
-    notefp = args[0]
+    notefp = f'./files/{args[0]}'
 
     if await file_already_exists_check(notefp):
         await send_help(f'File {notefp} already exists', message)
@@ -142,7 +142,7 @@ async def register_notefile(message, args):
 
 
 async def list_allfiles(message, args):
-    all_files = os.listdir('*.json')
+    all_files = os.listdir('./files/*.json')
 
     files_embed = discord.Embed(
         title='All files',
