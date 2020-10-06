@@ -234,7 +234,7 @@ async def on_message(message):
     if message.content.startswith('!notes'):
         split_message = message.content.split()
         command = split_message[1]
-        message_args = split_message[2:] if len(split_message) >= 3 else None
+        message_args = split_message[2:] if len(split_message) >= 3 and command != 'listfiles' else None
 
         if command not in command_map.keys():
             await send_help(f'Could not interpret command {command}', message)
