@@ -32,7 +32,7 @@ async def register_note(message, args):
     should_update = True if len(args) == 4 and args[3] == '--update' else False
 
     if await file_already_exists_check(fp):
-        message.channel.send(f'Invalid filepath')
+        await message.channel.send(f'Invalid filepath')
 
     if not validators.url(link):
         # URL is not valid
