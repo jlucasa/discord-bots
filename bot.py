@@ -3,7 +3,10 @@ import os
 import json
 import validators
 import glob
+import boto3
+from botocore import exceptions
 from dotenv import load_dotenv
+
 
 # TODO: make dictionary of arguments for each function to provide help with more modularity
 # TODO: make functions part of an object to safely store information in sessions
@@ -12,32 +15,52 @@ from dotenv import load_dotenv
 client = discord.Client()
 load_dotenv()
 
+s3_conn = boto3.resource(
+    service_name='s3',
+    region_name='us-east-1',
+    aws_access_key_id=os.getenv('ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('SECRET_ACCESS_KEY')
+)
+
+prefix = '!waiter'
+
 
 # Register a link to a note in the JSON file at LINK_FP
-async def register_note(message, args):
+async def register_note(message, args, reserves):
     if not args:
         # Args could not be passed in some way
-        await send_help(f'Could not interpret register command {message.content}', message)
+        await send_help(message, f'Could not interpret register command {message.content}')
         return
 
     if len(args) < 3:
         # There are not enough arguments to complete the command
-        await send_help(f'Not enough arguments in "{message.content}"', message)
+        await send_help(message, f'Not enough arguments in "{message.content}"')
         return
 
     # Filepath is first argument, entry is second argument, link is third argument
     # Note link is first argument, entry is second argument
-    fp = f'./files/{args[0]}'
+    fp = f'link-files/{args[0]}'
     entry = args[1]
     link = args[2]
     should_update = True if len(args) == 4 and args[3] == '--update' else False
 
-    if not await file_already_exists_check(fp):
+    file_retrieval_code = await file_already_exists_check(fp)
+
+    if file_retrieval_code == 1:
         await message.channel.send(f'Invalid filepath')
+        return
+    elif file_retrieval_code == 2:
+        await message.channel.send('Something went wrong when retrieving your file')
+        return
 
     if not validators.url(link):
         # URL is not valid
         await message.channel.send(f'Invalid URL: {link}')
+        return
+
+    if entry in reserves:
+        # Entry is a reserved word
+        await message.channel.send(f'This entry name is reserved: {entry}')
         return
 
     # Fetch all the data from the JSON file at fp
@@ -51,8 +74,8 @@ async def register_note(message, args):
         else:
             # The user is likely unaware that there is a link at this entry
             await send_help(
-                f'A link already exists for {entry}, and you did not specify to update using --update.',
-                message
+                message,
+                f'A link already exists for {entry}, and you did not specify to update using --update.'
             )
             return
 
@@ -65,16 +88,16 @@ async def register_note(message, args):
     await message.channel.send(f'Saved link for {entry}')
 
 
-async def serve_note(message, args):
+async def serve_note(message, args, reserves):
     if not args:
-        await send_help('Could not interpret serve command', message)
+        await send_help(message, 'Could not interpret serve command')
         return
 
     if len(args) < 2:
-        await send_help(f'Not enough arguments in "{message.content}"', message)
+        await send_help(message, f'Not enough arguments in "{message.content}"')
         return
 
-    fp = f'./files/{args[0]}'
+    fp = f'link-files/{args[0]}'
     entry = args[1]
 
     meeting_link_data = await open_json_file(fp)
@@ -86,24 +109,29 @@ async def serve_note(message, args):
     await message.channel.send(f'Here\'s that link! {meeting_link_data[entry]}')
 
 
-async def search_for_notes(message, args):
+async def search_for_notes(message, args, reserves):
     if not args:
-        await send_help('Could not interpret search command', message)
+        await send_help(message, 'Could not interpret search command')
         return
 
     if len(args) < 2:
-        await send_help(f'Not enough arguments in "{message.content}"', message)
+        await send_help(message, f'Not enough arguments in "{message.content}"')
         return
 
-    fp = f'./files/{args[0]}'
+    fp = f'link-files/{args[0]}'
     search_entry = args[1]
 
     data = await open_json_file(fp)
     all_entries = list(data.keys())
     results = []
 
-    if not await file_already_exists_check(fp):
-        await send_help(f'File "{fp}" doesn\'t exist', message)
+    file_retrieval_code = await file_already_exists_check(fp)
+
+    if file_retrieval_code == 1:
+        await send_help(message, f'File "{fp}" doesn\'t exist')
+        return
+    elif file_retrieval_code == 2:
+        await message.channel.send('Something went wrong when retrieving the file')
         return
 
     results.append(entry_i for entry_i in all_entries if entry_i.startswith(search_entry))
@@ -120,34 +148,40 @@ async def search_for_notes(message, args):
     for result_i in results:
         results_embed.add_field(
             name=str(result_i),
-            value=f'Command: !notes serve {fp} {result_i}'
+            value=f'Command: {prefix} serve {fp} {result_i}'
         )
 
     await message.channel.send(embed=results_embed)
 
 
-async def register_notefile(message, args):
+async def register_notefile(message, args, reserves):
     if not args:
         # Args could not be passed in some way
-        await send_help('Could not interpret regfile command', message)
+        await send_help(message, 'Could not interpret regfile command')
         return
 
-    notefp = f'./files/{args[0]}'
+    if args[0] in reserves:
+        await message.channel.send(f'Reserved file name: {args[0]}')
+        return
 
-    if await file_already_exists_check(notefp):
-        await send_help(f'File {notefp} already exists', message)
+    notefp = f'link-files/{args[0]}'
+    file_retrieval_code = await file_already_exists_check(notefp)
+
+    if file_retrieval_code == 0:
+        await send_help(message, f'File {notefp} already exists')
+        return
+    elif file_retrieval_code == 2:
+        await message.channel.send('Something went wrong when retrieving your file')
         return
 
     await create_json_file(notefp)
     await message.channel.send(f'Successfully created note file {notefp}')
 
 
-async def list_allfiles(message, args):
-    os.chdir('files')
-    all_files = glob.glob('*.json')
-    os.chdir('..')
+async def list_allfiles(message, args, reserves):
+    all_objs = s3_conn.Bucket('jamens-link-bucket').objects.filter(Delimiter='/', Prefix='link-files/')
 
-    if len(all_files) == 0:
+    if len([all_objs]) == 0:
         await message.channel.send('There were no files to be found!')
         return
 
@@ -156,93 +190,131 @@ async def list_allfiles(message, args):
         color=0xff0000
     )
 
-    for file in all_files:
+    for file_obj in all_objs:
         files_embed.add_field(
-            name=file,
+            name=file_obj.key.split('/')[-1],
             value='test'
         )
 
     await message.channel.send(embed=files_embed)
 
 
-async def send_help(error_msg, message):
+async def send_help(message, error_msg=None):
     help_embed = discord.Embed(
         title='Commands Help',
-        description='How to use me to register and serve up meeting notes!',
+        description='Here\'s what I can do for you! I don\'t get paid enough for this',
         color=0xff0000
     )
 
     help_embed.add_field(
-        name='Serve notes',
-        value='Usage: !notes serve <NAME>'
+        name='Serve link',
+        value=f'Serves a link based on an entry.\nUsage: {prefix} serve <FILENAME> <ENTRYNAME>'
     )
 
     help_embed.add_field(
-        name="this is a test",
-        value="of what embeds look like. this embed is not inline",
-        inline=False
+        name='Register link',
+        value=f'Registers a link with an entry.\nUsage: {prefix} register <FILENAME> <ENTRYNAME> <LINK>',
     )
 
     help_embed.add_field(
-        name="this is another test",
-        value="of what embeds look like. this embed is inline",
-        inline=True
+        name='Register file',
+        value=f'Registers a file. \nUsage: {prefix} registerfile <FILENAME>'
     )
 
-    await message.channel.send(error_msg)
+    help_embed.add_field(
+        name='List all files',
+        value=f'Lists all files. \nUsage: {prefix} listallfiles'
+    )
+
+    if error_msg is not None:
+        await message.channel.send(error_msg)
     await message.channel.send(embed=help_embed)
 
 
 async def open_json_file(fp):
-    with open(fp) as file:
+    s3_conn.Bucket('jamens-link-bucket').download_file(Key=fp, Filename=fp)
+
+    with open(fp, 'w+') as file:
         return json.load(file)
+
+    # try:
+    #     s3_conn.Bucket('jamens-link-bucket').download_file(Key=fp, Filename=fp)
+    #
+    #     with open(fp, 'w') as file:
+    #         return json.load(file)
+    # except exceptions.ClientError as e:
+    #     if e.response['Error']['Code'] == '404':
+    #         return json.loads('{"ERROR": "Not Found"}')
+    #
+    #     return json.loads('{"ERROR": "Something unknown went wrong."}')
 
 
 async def save_to_json_file(data, fp):
     with open(fp, 'w') as file:
         json.dump(data, file)
 
+    s3_conn.Bucket('jamens-link-bucket').upload_file(Filename=fp, Key=fp)
+
 
 async def create_json_file(fp):
-    with open(fp, 'w+') as file:
-        return
+    file = open(fp.split('/')[-1], 'w+')
+    s3_conn.Bucket('jamens-link-bucket').upload_file(Filename=fp.split('/')[-1], Key=fp)
+    os.remove(fp)
 
 
+'''
+Returns 0 for already exists, 1 for could not find, and 2 for 
+something went wrong.
+'''
 async def file_already_exists_check(fp):
-    return os.path.exists(fp)
+    try:
+        s3_conn.Bucket('jamens-link-bucket').Object(key=fp).load()
+    except exceptions.ClientError as e:
+        if int(e.response['Error']['Code']) == 404:
+            return 1
+        return 2
+
+    return 0
 
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user}')
 
+    # for obj in s3_conn.Bucket('jamens-link-bucket').objects.all():
+    #     print(obj)
 
 @client.event
 async def on_message(message):
     command_map = {
-        'reg': register_note,
+        'register': register_note,
         'serve': serve_note,
-        'regfile': register_notefile,
+        'registerfile': register_notefile,
         'search': search_for_notes,
-        'listfiles': list_allfiles
+        'listallfiles': list_allfiles,
+        'help': send_help
     }
+
+    reserved_words = [
+        'ERROR'
+    ]
 
     if message.author == client.user:
         return
 
-    if message.content.strip() == '!notes':
-        await send_help('You didn\'t seem to put a command in!', message)
+    if message.content.strip() == prefix:
+        await send_help(message, 'You didn\'t seem to put a command in!')
         return
 
-    if message.content.startswith('!notes'):
+    if message.content.startswith(prefix):
         split_message = message.content.split()
         command = split_message[1]
         message_args = split_message[2:] if len(split_message) >= 3 else None
 
         if command not in command_map.keys():
-            await send_help(f'Could not interpret command {command}', message)
+            await send_help(message, f'Could not interpret command {command}')
             return
 
-        await command_map[command](message, args=message_args)
+        await command_map[command](message, args=message_args, reserves=reserved_words)
 
 
 def main():
