@@ -17,7 +17,7 @@ load_dotenv()
 
 s3_conn = boto3.resource(
     service_name='s3',
-    region_name='us-east-1',
+    region_name='us-west-1',
     aws_access_key_id=os.getenv('ACCESS_KEY_ID'),
     aws_secret_access_key=os.getenv('SECRET_ACCESS_KEY')
 )
@@ -26,15 +26,15 @@ prefix = '!waiter'
 
 
 # Register a link to a note in the JSON file at LINK_FP
-async def register_note(message, args, reserves):
+async def register_note(message, args=None, reserves=None):
     if not args:
         # Args could not be passed in some way
-        await send_help(message, f'Could not interpret register command {message.content}')
+        await send_help(message, error_msg=f'Could not interpret register command {message.content}')
         return
 
     if len(args) < 3:
         # There are not enough arguments to complete the command
-        await send_help(message, f'Not enough arguments in "{message.content}"')
+        await send_help(message, error_msg=f'Not enough arguments in "{message.content}"')
         return
 
     # Filepath is first argument, entry is second argument, link is third argument
@@ -75,7 +75,7 @@ async def register_note(message, args, reserves):
             # The user is likely unaware that there is a link at this entry
             await send_help(
                 message,
-                f'A link already exists for {entry}, and you did not specify to update using --update.'
+                error_msg=f'A link already exists for {entry}, and you did not specify to update using --update.'
             )
             return
 
@@ -88,13 +88,13 @@ async def register_note(message, args, reserves):
     await message.channel.send(f'Saved link for {entry}')
 
 
-async def serve_note(message, args, reserves):
+async def serve_note(message, args=None, reserves=None):
     if not args:
-        await send_help(message, 'Could not interpret serve command')
+        await send_help(message, error_msg='Could not interpret serve command')
         return
 
     if len(args) < 2:
-        await send_help(message, f'Not enough arguments in "{message.content}"')
+        await send_help(message, error_msg=f'Not enough arguments in "{message.content}"')
         return
 
     fp = f'link-files/{args[0]}'
@@ -109,13 +109,13 @@ async def serve_note(message, args, reserves):
     await message.channel.send(f'Here\'s that link! {meeting_link_data[entry]}')
 
 
-async def search_for_notes(message, args, reserves):
+async def search_for_notes(message, args=None, reserves=None):
     if not args:
-        await send_help(message, 'Could not interpret search command')
+        await send_help(message, error_msg='Could not interpret search command')
         return
 
     if len(args) < 2:
-        await send_help(message, f'Not enough arguments in "{message.content}"')
+        await send_help(message, error_msg=f'Not enough arguments in "{message.content}"')
         return
 
     fp = f'link-files/{args[0]}'
@@ -128,7 +128,7 @@ async def search_for_notes(message, args, reserves):
     file_retrieval_code = await file_already_exists_check(fp)
 
     if file_retrieval_code == 1:
-        await send_help(message, f'File "{fp}" doesn\'t exist')
+        await send_help(message, error_msg=f'File "{fp}" doesn\'t exist')
         return
     elif file_retrieval_code == 2:
         await message.channel.send('Something went wrong when retrieving the file')
@@ -154,10 +154,10 @@ async def search_for_notes(message, args, reserves):
     await message.channel.send(embed=results_embed)
 
 
-async def register_notefile(message, args, reserves):
+async def register_notefile(message, args=None, reserves=None):
     if not args:
         # Args could not be passed in some way
-        await send_help(message, 'Could not interpret regfile command')
+        await send_help(message, error_msg='Could not interpret regfile command')
         return
 
     if args[0] in reserves:
@@ -168,7 +168,7 @@ async def register_notefile(message, args, reserves):
     file_retrieval_code = await file_already_exists_check(notefp)
 
     if file_retrieval_code == 0:
-        await send_help(message, f'File {notefp} already exists')
+        await send_help(message, error_msg=f'File {notefp} already exists')
         return
     elif file_retrieval_code == 2:
         await message.channel.send('Something went wrong when retrieving your file')
@@ -178,7 +178,7 @@ async def register_notefile(message, args, reserves):
     await message.channel.send(f'Successfully created note file {notefp}')
 
 
-async def list_allfiles(message, args, reserves):
+async def list_allfiles(message, args=None, reserves=None):
     all_objs = s3_conn.Bucket('jamens-link-bucket').objects.filter(Delimiter='/', Prefix='link-files/')
 
     if len([all_objs]) == 0:
@@ -199,7 +199,7 @@ async def list_allfiles(message, args, reserves):
     await message.channel.send(embed=files_embed)
 
 
-async def send_help(message, error_msg=None):
+async def send_help(message, args=None, error_msg=None, reserves=None):
     help_embed = discord.Embed(
         title='Commands Help',
         description='Here\'s what I can do for you! I don\'t get paid enough for this',
@@ -231,11 +231,27 @@ async def send_help(message, error_msg=None):
     await message.channel.send(embed=help_embed)
 
 
-async def open_json_file(fp):
-    s3_conn.Bucket('jamens-link-bucket').download_file(Key=fp, Filename=fp)
+async def download_file(src_fp, dest_fp):
+    s3_conn.Bucket('jamens-link-bucket').download_file(Key=src_fp, Filename=dest_fp)
 
-    with open(fp, 'w+') as file:
+
+async def upload_file(src_fp, dest_fp):
+    s3_conn.Bucket('jamens-link-bucket').upload_file(Filename=src_fp, Key=dest_fp)
+
+
+async def open_json_file(fp):
+    dest_fp = fp.split('/')[-1]
+
+    await download_file(fp, dest_fp)
+
+    with open(dest_fp) as file:
         return json.load(file)
+    # s3_conn.Bucket('jamens-link-bucket').download_file(Key=fp, Filename=dest_fp)
+
+
+    # with open(dest_fp, 'w+') as file:
+    #     print(file)
+    #     return json.load(file)
 
     # try:
     #     s3_conn.Bucket('jamens-link-bucket').download_file(Key=fp, Filename=fp)
@@ -250,16 +266,23 @@ async def open_json_file(fp):
 
 
 async def save_to_json_file(data, fp):
-    with open(fp, 'w') as file:
+    src_fp = fp.split('/')[-1]
+
+    with open(src_fp, 'w') as file:
         json.dump(data, file)
 
-    s3_conn.Bucket('jamens-link-bucket').upload_file(Filename=fp, Key=fp)
+    await upload_file(src_fp, fp)
+    os.remove(src_fp)
 
 
 async def create_json_file(fp):
-    file = open(fp.split('/')[-1], 'w+')
+    src_fp = fp.split('/')[-1]
+
+    with open(src_fp, 'w+') as file:
+        json.dump({"START": "TEST"}, file)
+
     s3_conn.Bucket('jamens-link-bucket').upload_file(Filename=fp.split('/')[-1], Key=fp)
-    os.remove(fp)
+    os.remove(src_fp)
 
 
 '''
@@ -302,7 +325,7 @@ async def on_message(message):
         return
 
     if message.content.strip() == prefix:
-        await send_help(message, 'You didn\'t seem to put a command in!')
+        await send_help(message, error_msg='You didn\'t seem to put a command in!')
         return
 
     if message.content.startswith(prefix):
@@ -311,7 +334,7 @@ async def on_message(message):
         message_args = split_message[2:] if len(split_message) >= 3 else None
 
         if command not in command_map.keys():
-            await send_help(message, f'Could not interpret command {command}')
+            await send_help(message, error_msg=f'Could not interpret command {command}')
             return
 
         await command_map[command](message, args=message_args, reserves=reserved_words)
